@@ -1,0 +1,16 @@
+schemaVersion: 2.2.2
+metadata:
+  name: devspace-demo
+  version: 1.0.0
+components:
+  - name: python
+    container:
+      image: registry.redhat.io/devspaces/udi-rhel8:latest
+      memoryLimit: 512Mi
+      mountSources: true
+commands:
+  - id: run
+    exec:
+      component: python
+      commandLine: python app.py
+      workingDir: ${PROJECT_SOURCE}

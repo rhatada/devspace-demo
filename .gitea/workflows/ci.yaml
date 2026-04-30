@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show environment
+        run: |
+          echo "=== CI running in DevSpace ==="
+          echo "Runner: $(hostname)"
+          echo "Python: $(python3 --version 2>&1 || echo 'not available')"
+          echo "Git: $(git --version 2>&1 || echo 'not available')"
+
+      - name: Run application
+        run: |
+          cd $GITHUB_WORKSPACE 2>/dev/null || true
+          echo "Hello from Gitea Actions CI!"

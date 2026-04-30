@@ -2,15 +2,150 @@ schemaVersion: 2.2.2
 metadata:
   name: devspace-demo
   version: 1.0.0
+
 components:
+  # --- Containers ---
   - name: python
     container:
       image: registry.redhat.io/devspaces/udi-rhel8:latest
       memoryLimit: 512Mi
+      memoryRequest: 256Mi
+      cpuLimit: "0.5"
+      cpuRequest: "0.2"
       mountSources: true
+      env:
+        - name: GITEA_URL
+          value: "http://localhost:3000"
+        - name: POSTGRES_HOST
+          value: localhost
+        - name: POSTGRES_PORT
+          value: "5432"
+
+  - name: postgres
+    container:
+      image: docker.io/library/postgres:15-alpine
+      memoryLimit: 512Mi
+      memoryRequest: 256Mi
+      cpuLimit: "0.4"
+      cpuRequest: "0.2"
+      env:
+        - name: POSTGRES_DB
+          value: gitea
+        - name: POSTGRES_USER
+          value: gitea
+        - name: POSTGRES_PASSWORD
+          value: gitea
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+      volumeMounts:
+        - name: postgres-data
+          path: /var/lib/postgresql/data
+      endpoints:
+        - name: postgres
+          targetPort: 5432
+          exposure: internal
+
+  - name: gitea
+    container:
+      image: docker.io/gitea/gitea:1.22
+      memoryLimit: 768Mi
+      memoryRequest: 512Mi
+      cpuLimit: "0.6"
+      cpuRequest: "0.3"
+      mountSources: true
+      env:
+        - name: GITEA__database__DB_TYPE
+          value: postgres
+        - name: GITEA__database__HOST
+          value: "localhost:5432"
+        - name: GITEA__database__NAME
+          value: gitea
+        - name: GITEA__database__USER
+          value: gitea
+        - name: GITEA__database__PASSWD
+          value: gitea
+        - name: GITEA__server__ROOT_URL
+          value: "http://localhost:3000"
+        - name: GITEA__server__HTTP_PORT
+          value: "3000"
+        - name: GITEA__security__INSTALL_LOCK
+          value: "true"
+        - name: GITEA__actions__ENABLED
+          value: "true"
+        - name: GITEA__service__DISABLE_REGISTRATION
+          value: "false"
+      volumeMounts:
+        - name: gitea-data
+          path: /data
+        - name: shared-config
+          path: /shared
+      endpoints:
+        - name: gitea-web
+          targetPort: 3000
+          exposure: public
+          protocol: http
+
+  - name: act-runner
+    container:
+      image: docker.io/gitea/act_runner:latest
+      memoryLimit: 1Gi
+      memoryRequest: 512Mi
+      cpuLimit: "1"
+      cpuRequest: "0.5"
+      command: ["sh"]
+      args: ["-c", "sleep infinity"]
+      mountSources: true
+      volumeMounts:
+        - name: runner-data
+          path: /data
+        - name: shared-config
+          path: /shared
+
+  # --- Volumes ---
+  - name: postgres-data
+    volume:
+      size: 5Gi
+
+  - name: gitea-data
+    volume:
+      size: 5Gi
+
+  - name: runner-data
+    volume:
+      size: 2Gi
+
+  - name: shared-config
+    volume:
+      size: 100Mi
+
 commands:
   - id: run
     exec:
       component: python
       commandLine: python app.py
+      workingDir: ${PROJECT_SOURCE}
+
+  - id: init-gitea
+    exec:
+      component: gitea
+      commandLine: bash ${PROJECT_SOURCE}/scripts/init-gitea.sh
+      workingDir: ${PROJECT_SOURCE}
+
+  - id: init-runner
+    exec:
+      component: act-runner
+      commandLine: bash ${PROJECT_SOURCE}/scripts/init-runner.sh
+      workingDir: ${PROJECT_SOURCE}
+
+  - id: init-cicd
+    composite:
+      commands:
+        - init-gitea
+        - init-runner
+      parallel: false
+
+  - id: check-gitea
+    exec:
+      component: python
+      commandLine: curl -sf http://localhost:3000/api/v1/version && echo ""
       workingDir: ${PROJECT_SOURCE}

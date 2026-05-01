@@ -47,7 +47,7 @@ components:
 
   - name: gitea
     container:
-      image: docker.io/gitea/gitea:1.22
+      image: docker.io/gitea/gitea:1.22-rootless
       memoryLimit: 768Mi
       memoryRequest: 512Mi
       cpuLimit: "0.6"
@@ -76,7 +76,9 @@ components:
           value: "false"
       volumeMounts:
         - name: gitea-data
-          path: /data
+          path: /var/lib/gitea
+        - name: gitea-config
+          path: /etc/gitea
         - name: shared-config
           path: /shared
       endpoints:
@@ -109,6 +111,10 @@ components:
   - name: gitea-data
     volume:
       size: 5Gi
+
+  - name: gitea-config
+    volume:
+      size: 100Mi
 
   - name: runner-data
     volume:
